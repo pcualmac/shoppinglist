@@ -71,36 +71,5 @@ class UsersSeeder extends Seeder
             }
         }
 
-        $extraUser = User::updateOrCreate(
-            ['email' => 'pumpignano@gmail.com'],
-            [
-                'name' => 'user17',
-                'password' => Hash::make('pass17'),
-            ]
-        );
-
-        $extraListId = DB::table('shopping_lists')->insertGetId([
-            'user_id' => $extraUser->id,
-            'name' => "user17's list",
-            'spending_limit' => random_int(25, 120),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        $extraItemCount = random_int(3, 10);
-        $extraSelectedNames = collect($groceryNames)->shuffle()->take($extraItemCount)->values();
-
-        foreach ($extraSelectedNames as $index => $name) {
-            DB::table('shopping_items')->insert([
-                'shopping_list_id' => $extraListId,
-                'name' => $name,
-                'quantity' => random_int(1, 5),
-                'price' => random_int(50, 1500) / 100,
-                'is_purchased' => (bool) random_int(0, 1),
-                'sort_order' => $index,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
     }
 }
