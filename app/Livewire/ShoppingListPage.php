@@ -4,8 +4,10 @@ namespace App\Livewire;
 
 use App\Models\ShoppingItem;
 use App\Models\ShoppingList;
+use App\Mail\ShoppingListSummary;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -26,6 +28,7 @@ class ShoppingListPage extends Component
     public ?string $limitEur = null;
     public ?string $limitGbp = null;
     public bool $pickedOnly = false;
+    public ?string $emailNotice = null;
 
     protected array $queryString = [
         'search' => ['except' => ''],
@@ -258,6 +261,71 @@ class ShoppingListPage extends Component
     public function setSort(string $sort): void
     {
         $this->sort = $sort;
+    }
+
+    public function sendListEmail(): void
+    {
+        $user = Auth::user();
+
+        $list = DB::table('shopping_lists')
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (!$list) {
+            $this->emailNotice = 'No shopping list found to send.';
+            return;
+        }
+
+        $itemsQuery = DB::table('shopping_items')
+            ->where('shopping_list_id', $list->id);
+
+        $searchTerm = trim($this->search);
+        if ($searchTerm !== '') {
+            $itemsQuery->where('name', 'like', "%{$searchTerm}%");
+        }
+
+        if ($this->pickedOnly) {
+            $itemsQuery->where('is_purchased', true);
+        }
+
+        if ($this->sort === 'name') {
+            $itemsQuery->orderBy('name');
+        } elseif ($this->sort === 'picked') {
+            $itemsQuery->orderByDesc('is_purchased')->orderBy('sort_order');
+        } else {
+            $itemsQuery->orderBy('sort_order');
+        }
+
+        $items = $itemsQuery->get();
+
+        $totals = DB::table('shopping_items')
+            ->select('currency', DB::raw('SUM(price * quantity) as total'))
+            ->where('shopping_list_id', $list->id)
+            ->groupBy('currency')
+            ->pluck('total', 'currency')
+            ->map(fn ($value) => (float) $value)
+            ->all();
+
+        $pickedTotals = DB::table('shopping_items')
+            ->select('currency', DB::raw('SUM(price * quantity) as total'))
+            ->where('shopping_list_id', $list->id)
+            ->where('is_purchased', true)
+            ->groupBy('currency')
+            ->pluck('total', 'currency')
+            ->map(fn ($value) => (float) $value)
+            ->all();
+
+        Mail::to($user->email)->send(new ShoppingListSummary(
+            listName: $list->name,
+            items: $items,
+            totals: $totals,
+            pickedTotals: $pickedTotals,
+            searchTerm: $searchTerm,
+            pickedOnly: $this->pickedOnly,
+            sort: $this->sort
+        ));
+
+        $this->emailNotice = "List sent to {$user->email}.";
     }
 
     public function togglePickedOnly(): void

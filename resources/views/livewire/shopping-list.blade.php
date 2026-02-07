@@ -356,6 +356,9 @@
                     placeholder="Search products"
                     wire:model.live.debounce.300ms="search"
                 >
+                <button class="sort-button no-icon" wire:click="sendListEmail" type="button">
+                    Email list
+                </button>
                 <button class="sort-button no-icon {{ $pickedOnly ? 'active' : '' }}" wire:click="togglePickedOnly" type="button">
                     Picked up only
                 </button>
@@ -366,6 +369,9 @@
                     Picked up on top
                 </button>
             </div>
+            @if ($emailNotice)
+                <div class="notice">{{ $emailNotice }}</div>
+            @endif
             <div class="limits">
                 <div class="limit-card">
                     <h3>
